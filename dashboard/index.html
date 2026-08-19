@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Content Repurposer - Dashboard de Revisao</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .aprovado { border-left: 6px solid #22c55e; }
+        .descartado { border-left: 6px solid #ef4444; opacity: 0.5; }
+        .neutro { border-left: 6px solid #cbd5e1; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+    <div class="max-w-4xl mx-auto p-6">
+        <!-- Cabecalho -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-indigo-700 mb-2">AI Content Repurposer</h1>
+            <p class="text-slate-500">Revise, aprove e copie as pecas geradas pelo script</p>
+        </header>
+
+        <!-- Upload / Colar -->
+        <section class="bg-white rounded-xl shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">1. Carregar conteudo gerado</h2>
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">Cole aqui o conteudo do arquivo <code>conteudo.json</code>:</label>
+                <textarea id="jsonInput" rows="6" class="w-full border border-slate-300 rounded-lg p-3 text-sm font-mono" placeholder='{ "resumo_executivo": [...], "posts_sociais": [...], ... }'></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="carregarJSON()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium">
+                    Carregar no dashboard
+                </button>
+                <button onclick="carregarExemplo()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium">
+                    Ver exemplo
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Dica: voce tambem pode arrastar o arquivo conteudo.json para a area de texto.</p>
+        </section>
+
+        <!-- Titulos -->
+        <section id="secaoTitulos" class="hidden bg-white rounded-xl shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">2. Titulos alternativos</h2>
+            <div id="listaTitulos" class="space-y-3"></div>
+        </section>
+
+        <!-- Resumo -->
+        <section id="secaoResumo" class="hidden bg-white rounded-xl shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">3. Resumo executivo</h2>
+            <div id="listaResumo" class="space-y-3"></div>
+        </section>
+
+        <!-- Posts -->
+        <section id="secaoPosts" class="hidden bg-white rounded-xl shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">4. Posts para redes sociais</h2>
+            <div id="listaPosts" class="space-y-4"></div>
+        </section>
+
+        <!-- Exportar -->
+        <section id="secaoExportar" class="hidden bg-white rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold mb-4">5. Texto final aprovado</h2>
+            <textarea id="textoFinal" rows="10" class="w-full border border-slate-300 rounded-lg p-3 text-sm" readonly></textarea>
+            <div class="flex gap-3 mt-4">
+                <button onclick="copiarFinal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium">
+                    Copiar texto final
+                </button>
+                <button onclick="baixarFinal()" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium">
+                    Baixar como .txt
+                </button>
+            </div>
+            <p id="msgCopiado" class="text-green-600 text-sm mt-2 hidden">Copiado para a area de transferencia!</p>
+        </section>
+    </div>
+
+    <script>
+        // Exemplo embutido para demonstracao
+        const exemploJSON = {
+            "resumo_executivo": [
+                "1. O marketing de conteudo evoluiu: qualidade superou quantidade.",
+                "2. Entender o publico e o primeiro passo de uma estrategia solida.",
+                "3. Consistencia na publicacao ajuda a construir autoridade.",
+                "4. E importante medir resultados e ajustar a estrategia.",
+                "5. Clareza, consistencia e analise geram presenca digital forte."
+            ],
+            "posts_sociais": [
+                {
+                    "plataforma": "LinkedIn",
+                    "texto": "O marketing de conteudo mudou.\n\nSe voce trabalha com estrategia, consistencia e publico, esse material e para voce.\n\nAqui estao os pontos que mais me chamaram atencao:\n- estrategia\n- consistencia\n- publico\n\nQual desses voce quer aplicar primeiro? Comenta aqui."
+                },
+                {
+                    "plataforma": "Instagram / Threads",
+                    "texto": "O marketing de conteudo mudou.\n\nestrategia, consistencia e publico nao precisa ser complicado.\nO segredo e transformar ideias grandes em acoes pequenas.\n\nSalva esse post para revisar depois e me conta: qual dica fez mais sentido para voce?"
+                },
+                {
+                    "plataforma": "X (Twitter)",
+                    "texto": "O marketing de conteudo mudou.\n\n3 aprendizados rapidos sobre estrategia, consistencia e publico:\n1. Clareza vence volume.\n2. Foco no publico certo.\n3. Repeticao com proposito.\n\nConcorda? Da RT se fez sentido."
+                }
+            ],
+            "titulos_alternativos": [
+                "Como transformar estrategia em resultados reais",
+                "O guia pratico de consistencia que voce precisa ler",
+                "Estrategia: o que funciona (e o que nao funciona) em 2025"
+            ],
+            "metadados": {
+                "data_geracao": "2025-01-01T00:00:00",
+                "modo": "demonstracao"
+            }
+        };
+
+        // Estado atual dos itens
+        let estado = {
+            titulos: [],
+            resumo: [],
+            posts: []
+        };
+
+        function carregarExemplo() {
+            document.getElementById('jsonInput').value = JSON.stringify(exemploJSON, null, 2);
+            carregarJSON();
+        }
+
+        function carregarJSON() {
+            const raw = document.getElementById('jsonInput').value.trim();
+            if (!raw) {
+                alert('Cole o conteudo do conteudo.json primeiro.');
+                return;
+            }
+
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (e) {
+                alert('JSON invalido. Verifique o arquivo e tente novamente.\nErro: ' + e.message);
+                return;
+            }
+
+            // Inicializa estado
+            estado.titulos = (data.titulos_alternativos || []).map(t => ({ texto: t, status: 'neutro' }));
+            estado.resumo = (data.resumo_executivo || []).map(r => ({ texto: r, status: 'neutro' }));
+            estado.posts = (data.posts_sociais || []).map(p => ({ texto: p.texto, plataforma: p.plataforma, status: 'neutro' }));
+
+            renderizar();
+
+            document.getElementById('secaoTitulos').classList.remove('hidden');
+            document.getElementById('secaoResumo').classList.remove('hidden');
+            document.getElementById('secaoPosts').classList.remove('hidden');
+            document.getElementById('secaoExportar').classList.remove('hidden');
+        }
+
+        function renderizar() {
+            // Titulos
+            const listaTitulos = document.getElementById('listaTitulos');
+            listaTitulos.innerHTML = estado.titulos.map((item, i) => `
+                <div class="neutro p-4 rounded-lg bg-slate-50 flex justify-between items-start gap-4 transition-all" id="titulo-${i}">
+                    <p class="flex-1">${item.texto}</p>
+                    <div class="flex gap-2">
+                        <button onclick="aprovar('titulo', ${i})" class="text-sm bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Aprovar</button>
+                        <button onclick="descartar('titulo', ${i})" class="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200">Descartar</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Resumo
+            const listaResumo = document.getElementById('listaResumo');
+            listaResumo.innerHTML = estado.resumo.map((item, i) => `
+                <div class="neutro p-4 rounded-lg bg-slate-50 flex justify-between items-start gap-4 transition-all" id="resumo-${i}">
+                    <p class="flex-1">${item.texto}</p>
+                    <div class="flex gap-2">
+                        <button onclick="aprovar('resumo', ${i})" class="text-sm bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Aprovar</button>
+                        <button onclick="descartar('resumo', ${i})" class="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200">Descartar</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Posts
+            const listaPosts = document.getElementById('listaPosts');
+            listaPosts.innerHTML = estado.posts.map((item, i) => `
+                <div class="neutro p-4 rounded-lg bg-slate-50 transition-all" id="post-${i}">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-semibold text-indigo-600">${item.plataforma}</span>
+                        <div class="flex gap-2">
+                            <button onclick="aprovar('post', ${i})" class="text-sm bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200">Aprovar</button>
+                            <button onclick="descartar('post', ${i})" class="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200">Descartar</button>
+                        </div>
+                    </div>
+                    <pre class="whitespace-pre-wrap text-sm text-slate-700 font-sans">${item.texto}</pre>
+                </div>
+            `).join('');
+
+            atualizarClasses();
+            montarFinal();
+        }
+
+        function atualizarClasses() {
+            function aplicar(tipo, lista) {
+                lista.forEach((item, i) => {
+                    const el = document.getElementById(`${tipo}-${i}`);
+                    if (!el) return;
+                    el.classList.remove('aprovado', 'descartado', 'neutro');
+                    el.classList.add(item.status);
+                });
+            }
+            aplicar('titulo', estado.titulos);
+            aplicar('resumo', estado.resumo);
+            aplicar('post', estado.posts);
+        }
+
+        function aprovar(tipo, i) {
+            estado[`${tipo}s`][i].status = 'aprovado';
+            atualizarClasses();
+            montarFinal();
+        }
+
+        function descartar(tipo, i) {
+            estado[`${tipo}s`][i].status = 'descartado';
+            atualizarClasses();
+            montarFinal();
+        }
+
+        function montarFinal() {
+            let partes = [];
+
+            const titulosAprovados = estado.titulos.filter(t => t.status === 'aprovado');
+            if (titulosAprovados.length > 0) {
+                partes.push("TITULOS APROVADOS:\n" + titulosAprovados.map(t => "- " + t.texto).join("\n"));
+            }
+
+            const resumoAprovado = estado.resumo.filter(r => r.status === 'aprovado');
+            if (resumoAprovado.length > 0) {
+                partes.push("RESUMO EXECUTIVO:\n" + resumoAprovado.map(r => "- " + r.texto).join("\n"));
+            }
+
+            const postsAprovados = estado.posts.filter(p => p.status === 'aprovado');
+            if (postsAprovados.length > 0) {
+                partes.push("POSTS APROVADOS:\n" + postsAprovados.map(p => `[${p.plataforma}]\n${p.texto}`).join("\n\n"));
+            }
+
+            document.getElementById('textoFinal').value = partes.join("\n\n---\n\n");
+        }
+
+        function copiarFinal() {
+            const textarea = document.getElementById('textoFinal');
+            textarea.select();
+            document.execCommand('copy');
+            const msg = document.getElementById('msgCopiado');
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 2000);
+        }
+
+        function baixarFinal() {
+            const texto = document.getElementById('textoFinal').value;
+            if (!texto) {
+                alert('Nenhum texto aprovado para baixar.');
+                return;
+            }
+            const blob = new Blob([texto], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'conteudo-aprovado.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
