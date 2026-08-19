@@ -1,0 +1,4 @@
+# Dependencias do AI Content Repurposer
+# Nesta versao inicial, usamos apenas bibliotecas padrao do Python.
+# Se quiser usar a API da OpenAI no futuro, descomente a linha abaixo:
+# openai>=1.0.0
